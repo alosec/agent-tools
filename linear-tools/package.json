@@ -1,8 +1,8 @@
 {
-	"name": "linear-docs",
+	"name": "linear-tools",
 	"version": "1.0.0",
 	"type": "module",
-	"description": "Linear document CLI tools for agents",
+	"description": "Linear CLI tools for agents (documents, projects)",
 	"author": "Alex Garcia",
 	"license": "MIT",
 	"dependencies": {}
