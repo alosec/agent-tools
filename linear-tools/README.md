@@ -143,6 +143,66 @@ All commands output JSON:
 
 ---
 
+## Views (Custom Views)
+
+### List Views
+
+```bash
+linear-view-list.js
+linear-view-list.js --team <teamId>
+linear-view-list.js --shared
+linear-view-list.js --private
+```
+
+### Read View
+
+```bash
+linear-view-read.js <viewId>
+```
+
+### Create View
+
+```bash
+linear-view-create.js "View Name" --team <teamId> [options]
+```
+
+**Options:**
+- `--team <id>` - Team ID (required for team-visible views)
+- `--description <text>` - View description
+- `--shared` - Make visible to whole org
+- `--filter <json>` - Filter as JSON string
+- `--filter-file <path>` - Read filter from JSON file
+
+**Shortcuts:**
+- `--priority <1-4>` - Filter by priority
+- `--state <type>` - Filter by state (backlog, unstarted, started, completed, canceled)
+- `--exclude-done` - Exclude completed and canceled
+
+**Examples:**
+```bash
+linear-view-create.js "P1 Urgent" --team <id> --priority 1 --shared
+linear-view-create.js "Active" --team <id> --exclude-done --shared
+linear-view-create.js "Custom" --team <id> --filter '{"priority":{"in":[1,2]}}'
+```
+
+### Update View
+
+```bash
+linear-view-update.js <viewId> --name "New Name"
+linear-view-update.js <viewId> --shared
+linear-view-update.js <viewId> --filter '{"state":{"type":{"eq":"started"}}}'
+```
+
+### Delete View
+
+```bash
+linear-view-delete.js <viewId>
+```
+
+**Note:** Views need `--team` to show up in the team UI on mobile.
+
+---
+
 ## Favorites
 
 ### List Favorites
