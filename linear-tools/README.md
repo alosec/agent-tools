@@ -141,6 +141,39 @@ All commands output JSON:
 }
 ```
 
+---
+
+## Favorites
+
+### List Favorites
+
+```bash
+linear-favorite-list.js
+linear-favorite-list.js --type project
+linear-favorite-list.js --type folder
+```
+
+### Create Favorite
+
+```bash
+linear-favorite-create.js --project <id>
+linear-favorite-create.js --issue <id>
+linear-favorite-create.js --document <id>
+linear-favorite-create.js --cycle <id>
+linear-favorite-create.js --folder "My Folder"
+linear-favorite-create.js --project <id> --parent <folderId>
+```
+
+### Delete Favorite
+
+```bash
+linear-favorite-delete.js <favoriteId>
+```
+
+Use `linear-favorite-list.js` to find favorite IDs.
+
+---
+
 ## Setup
 
 1. Set `LINEAR_API_TOKEN` environment variable
