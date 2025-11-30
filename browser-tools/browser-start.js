@@ -15,9 +15,43 @@ if (process.argv[2] && process.argv[2] !== "--profile") {
 	process.exit(1);
 }
 
+// Detect Chrome path based on platform
+function getChromePath() {
+	if (process.platform === "darwin") {
+		return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+	} else if (process.platform === "linux") {
+		// Try common Linux paths
+		const paths = ["/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium"];
+		for (const p of paths) {
+			try {
+				execSync(`test -x ${p}`, { stdio: "ignore" });
+				return p;
+			} catch {}
+		}
+		throw new Error("Chrome/Chromium not found");
+	} else {
+		throw new Error(`Unsupported platform: ${process.platform}`);
+	}
+}
+
+function getProfilePath() {
+	if (process.platform === "darwin") {
+		return "/Users/badlogic/Library/Application Support/Google/Chrome/";
+	} else if (process.platform === "linux") {
+		return `${process.env["HOME"]}/.config/google-chrome/`;
+	}
+	return null;
+}
+
+const chromePath = getChromePath();
+
 // Kill existing Chrome
 try {
-	execSync("killall 'Google Chrome'", { stdio: "ignore" });
+	if (process.platform === "darwin") {
+		execSync("killall 'Google Chrome'", { stdio: "ignore" });
+	} else {
+		execSync("pkill -f 'chrome.*remote-debugging'", { stdio: "ignore" });
+	}
 } catch {}
 
 // Wait a bit for processes to fully die
@@ -27,16 +61,19 @@ await new Promise((r) => setTimeout(r, 1000));
 execSync("mkdir -p ~/.cache/scraping", { stdio: "ignore" });
 
 if (useProfile) {
-	// Sync profile with rsync (much faster on subsequent runs)
-	execSync(
-		'rsync -a --delete "/Users/badlogic/Library/Application Support/Google/Chrome/" ~/.cache/scraping/',
-		{ stdio: "pipe" },
-	);
+	const profilePath = getProfilePath();
+	if (profilePath) {
+		// Sync profile with rsync (much faster on subsequent runs)
+		execSync(
+			`rsync -a --delete "${profilePath}" ~/.cache/scraping/`,
+			{ stdio: "pipe" },
+		);
+	}
 }
 
 // Start Chrome in background (detached so Node can exit)
 spawn(
-	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+	chromePath,
 	["--remote-debugging-port=9222", `--user-data-dir=${process.env["HOME"]}/.cache/scraping`],
 	{ detached: true, stdio: "ignore" },
 ).unref();
