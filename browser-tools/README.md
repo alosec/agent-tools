@@ -87,6 +87,20 @@ Search Google and return results. Options:
 - `-n <num>` - Number of results (default: 5, supports pagination for higher numbers)
 - `--content` - Fetch and extract readable content as markdown from each result
 
+## Upload File
+
+```bash
+node upload.js /path/to/file.png
+```
+
+Upload a file using the current page's file input. Assumes you've already navigated to a page with an upload form. The script:
+1. Finds a file input element
+2. Uploads the specified file
+3. Clicks any "Upload" button
+4. Returns the result URL (expects it in a `<code>` element)
+
+Works with any standard file upload form.
+
 ## Extract Page Content
 
 ```bash
