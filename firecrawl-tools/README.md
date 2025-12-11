@@ -20,6 +20,20 @@ Scrape a URL and return markdown content.
 ./firecrawl-scrape.sh https://example.com/article
 ```
 
+### firecrawl-search.sh
+
+Search the web using Firecrawl.
+
+```bash
+# Basic search
+./firecrawl-search.sh "best pizza austin"
+
+# With custom limit (default 5)
+./firecrawl-search.sh "climate change effects" 10
+```
+
+Returns title, url, and description for each result.
+
 ### firecrawl-extract.sh
 
 Extract structured data from a URL using a JSON schema.
