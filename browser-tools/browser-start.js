@@ -3,100 +3,143 @@
 import { spawn, execSync } from "node:child_process";
 import puppeteer from "puppeteer-core";
 
-const useProfile = process.argv[2] === "--profile";
+// Parse arguments
+const args = process.argv.slice(2);
+const useProfile = args.includes("--profile");
+const profileArg = args.find(a => a.startsWith("--profile="));
+const profileName = profileArg ? profileArg.split("=")[1] : "Default";
+const forceRestart = args.includes("--restart");
+const helpFlag = args.includes("--help") || args.includes("-h");
 
-if (process.argv[2] && process.argv[2] !== "--profile") {
-	console.log("Usage: start.ts [--profile]");
-	console.log("\nOptions:");
-	console.log("  --profile  Copy your default Chrome profile (cookies, logins)");
-	console.log("\nExamples:");
-	console.log("  start.ts            # Start with fresh profile");
-	console.log("  start.ts --profile  # Start with your Chrome profile");
-	process.exit(1);
+if (helpFlag) {
+	console.log(`Usage: browser-start.js [options]
+
+Options:
+  --profile          Use your Chrome Default profile (cookies, logins)
+  --profile=NAME     Use specific profile by name
+  --restart          Kill existing Chrome and restart
+  -h, --help         Show this help
+
+Examples:
+  browser-start.js                    # Fresh/isolated profile (default)
+  browser-start.js --restart          # Force restart with fresh profile
+  browser-start.js --profile          # Use your Default Chrome profile
+`);
+	process.exit(0);
 }
 
-// Detect Chrome path based on platform
+const CHROME_PORT = 9222;
+const USER_DATA_DIR = `${process.env.HOME}/.cache/browser-tools`;
+
+// Detect Chrome path
 function getChromePath() {
 	if (process.platform === "darwin") {
 		return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-	} else if (process.platform === "linux") {
-		// Try common Linux paths
-		const paths = ["/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium"];
-		for (const p of paths) {
+	}
+	const paths = ["/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium"];
+	for (const p of paths) {
+		try {
+			execSync(`test -x ${p}`, { stdio: "ignore" });
+			return p;
+		} catch {}
+	}
+	throw new Error("Chrome/Chromium not found");
+}
+
+// Check if Chrome is already running and responsive
+async function isChromReady() {
+	try {
+		const browser = await Promise.race([
+			puppeteer.connect({ browserURL: `http://localhost:${CHROME_PORT}`, defaultViewport: null }),
+			new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2000)),
+		]);
+		await browser.disconnect();
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// Kill Chrome on our port
+function killChrome() {
+	try {
+		// Only kill chrome using OUR port, not all chrome instances
+		execSync(`pkill -f 'chrome.*--remote-debugging-port=${CHROME_PORT}'`, { stdio: "ignore" });
+	} catch {}
+}
+
+// Main
+async function main() {
+	// If Chrome is already running and we don't want to restart, just verify
+	if (!forceRestart && await isChromReady()) {
+		console.log(`✓ Chrome already running on :${CHROME_PORT}`);
+		process.exit(0);
+	}
+
+	// Kill existing if restarting or if it's hung
+	killChrome();
+	await new Promise(r => setTimeout(r, 1000));
+
+	// Prepare user data directory
+	const userDataDir = useProfile ? `${process.env.HOME}/.config/google-chrome` : USER_DATA_DIR;
+	
+	if (!useProfile) {
+		execSync(`mkdir -p "${USER_DATA_DIR}"`, { stdio: "ignore" });
+	}
+
+	// Build Chrome args
+	const chromeArgs = [
+		`--remote-debugging-port=${CHROME_PORT}`,
+		`--user-data-dir=${userDataDir}`,
+		"--no-first-run",
+		"--disable-background-timer-throttling",
+		"--disable-backgrounding-occluded-windows",
+	];
+
+	if (useProfile) {
+		chromeArgs.push(`--profile-directory=${profileName}`);
+	}
+
+	// Get DISPLAY for Linux
+	const env = { ...process.env };
+	if (process.platform === "linux" && !env.DISPLAY) {
+		// Try common display values
+		for (const display of [":9", ":1", ":0"]) {
 			try {
-				execSync(`test -x ${p}`, { stdio: "ignore" });
-				return p;
+				execSync(`DISPLAY=${display} xdpyinfo`, { stdio: "ignore", timeout: 1000 });
+				env.DISPLAY = display;
+				break;
 			} catch {}
 		}
-		throw new Error("Chrome/Chromium not found");
-	} else {
-		throw new Error(`Unsupported platform: ${process.platform}`);
 	}
+
+	// Start Chrome
+	const chromePath = getChromePath();
+	const chrome = spawn(chromePath, chromeArgs, {
+		detached: true,
+		stdio: "ignore",
+		env,
+	});
+	chrome.unref();
+
+	// Wait for Chrome to be ready
+	let ready = false;
+	for (let i = 0; i < 30; i++) {
+		if (await isChromReady()) {
+			ready = true;
+			break;
+		}
+		await new Promise(r => setTimeout(r, 500));
+	}
+
+	if (!ready) {
+		console.error("✗ Failed to start Chrome");
+		console.error("  Try: DISPLAY=:9 browser-start.js --restart");
+		process.exit(1);
+	}
+
+	const profileInfo = useProfile ? ` (profile: ${profileName})` : " (fresh profile)";
+	console.log(`✓ Chrome started on :${CHROME_PORT}${profileInfo}`);
 }
 
-function getProfilePath() {
-	if (process.platform === "darwin") {
-		return "/Users/badlogic/Library/Application Support/Google/Chrome/";
-	} else if (process.platform === "linux") {
-		return `${process.env["HOME"]}/.config/google-chrome/`;
-	}
-	return null;
-}
-
-const chromePath = getChromePath();
-
-// Kill existing Chrome
-try {
-	if (process.platform === "darwin") {
-		execSync("killall 'Google Chrome'", { stdio: "ignore" });
-	} else {
-		execSync("pkill -f 'chrome.*remote-debugging'", { stdio: "ignore" });
-	}
-} catch {}
-
-// Wait a bit for processes to fully die
-await new Promise((r) => setTimeout(r, 1000));
-
-// Setup profile directory
-execSync("mkdir -p ~/.cache/scraping", { stdio: "ignore" });
-
-if (useProfile) {
-	const profilePath = getProfilePath();
-	if (profilePath) {
-		// Sync profile with rsync (much faster on subsequent runs)
-		execSync(
-			`rsync -a --delete "${profilePath}" ~/.cache/scraping/`,
-			{ stdio: "pipe" },
-		);
-	}
-}
-
-// Start Chrome in background (detached so Node can exit)
-spawn(
-	chromePath,
-	["--remote-debugging-port=9222", `--user-data-dir=${process.env["HOME"]}/.cache/scraping`],
-	{ detached: true, stdio: "ignore" },
-).unref();
-
-// Wait for Chrome to be ready by attempting to connect
-let connected = false;
-for (let i = 0; i < 30; i++) {
-	try {
-		const browser = await puppeteer.connect({
-			browserURL: "http://localhost:9222",
-			defaultViewport: null,
-		});
-		await browser.disconnect();
-		connected = true;
-		break;
-	} catch {
-		await new Promise((r) => setTimeout(r, 500));
-	}
-}
-
-if (!connected) {
-	console.error("✗ Failed to connect to Chrome");
-	process.exit(1);
-}
-
-console.log(`✓ Chrome started on :9222${useProfile ? " with your profile" : ""}`);
+main();
