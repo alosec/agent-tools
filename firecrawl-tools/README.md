@@ -53,15 +53,31 @@ Example schema file (`events-schema.json`):
   "properties": {
     "events": {
       "type": "array",
+      "description": "List of events found on the page",
       "items": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "date": { "type": "string" },
-          "venue": { "type": "string" }
+          "title": {
+            "type": "string",
+            "description": "Name of the event"
+          },
+          "date": {
+            "type": "string",
+            "description": "Date and time of the event"
+          },
+          "venue": {
+            "type": "string",
+            "description": "Location or venue name"
+          },
+          "price": {
+            "type": "string",
+            "description": "Ticket price or 'Free' if no cost"
+          }
         }
       }
     }
   }
 }
 ```
+
+The `description` fields help the LLM understand what data to extract for each field.
