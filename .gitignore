@@ -1,2 +1,8 @@
 node_modules/
 .DS_Store
+.env
+
+# Slack caches
+.channels_cache*.json
+.users_cache*.json
+*.cache.json
