@@ -1,79 +1,42 @@
-# Slack MCP CLI Tools
+# Slack Tools
 
-CLI wrapper for reading Slack messages via the [Slack MCP Server](https://github.com/korotovsky/slack-mcp-server).
+Use the Slack API directly. No wrapper scripts needed.
 
 ## Setup
 
-1. **Get the Slack MCP server binary:**
-   ```bash
-   # Build from source or download release
-   git clone https://github.com/korotovsky/slack-mcp-server
-   cd slack-mcp-server
-   go build -o slack-mcp-server ./cmd/slack-mcp-server
-   sudo mv slack-mcp-server /usr/local/bin/
-   ```
+Get a User OAuth Token (`xoxp-...`) from your Slack app with appropriate scopes.
 
-2. **Get a Slack token** (choose one method):
-   
-   **Option A: User OAuth (recommended)**
-   - Create app at api.slack.com/apps
-   - Add user scopes: `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `mpim:history`, `mpim:read`, `users:read`, `search:read`
-   - Install to workspace, copy User OAuth Token (`xoxp-...`)
-
-   **Option B: Browser tokens (stealth mode)**
-   - Extract `xoxc` from browser localStorage
-   - Extract `xoxd` from browser cookies
-
-3. **Configure:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your token
-   chmod 600 .env
-   ```
-
-## Usage
+## API Reference
 
 ```bash
-# List all channels
-./slack-mcp.sh channels
+# List channels
+curl -s "https://slack.com/api/conversations.list" \
+  -H "Authorization: Bearer $SLACK_TOKEN" | jq '.channels[] | {id, name}'
 
 # Get channel history
-./slack-mcp.sh history '#general'           # Last day (default)
-./slack-mcp.sh history '#mew-product' 10    # Last 10 messages
-./slack-mcp.sh history '@username' 1w       # DMs from last week
+curl -s "https://slack.com/api/conversations.history?channel=CHANNEL_ID&limit=20" \
+  -H "Authorization: Bearer $SLACK_TOKEN" | jq '.messages[]'
 
 # Search messages
-./slack-mcp.sh search 'deployment'
+curl -s "https://slack.com/api/search.messages?query=QUERY" \
+  -H "Authorization: Bearer $SLACK_TOKEN" | jq '.messages.matches[]'
+
+# Post message
+curl -s -X POST "https://slack.com/api/chat.postMessage" \
+  -H "Authorization: Bearer $SLACK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"channel": "CHANNEL_ID", "text": "Hello"}'
+
+# Get user info
+curl -s "https://slack.com/api/users.info?user=USER_ID" \
+  -H "Authorization: Bearer $SLACK_TOKEN" | jq '.user'
 ```
 
-## Output
+## Common Scopes
 
-Returns JSON-RPC response. Parse with jq:
-
-```bash
-# Get just the CSV text content
-./slack-mcp.sh channels | jq -r '.result.content[0].text'
-
-# Pretty table
-./slack-mcp.sh channels | jq -r '.result.content[0].text' | column -t -s,
-```
-
-## Limit formats
-
-- `1d` - 1 day
-- `1w` - 1 week  
-- `30d` - 30 days
-- `90d` - 90 days (free tier max)
-- `10` - number of messages
-
-## Files
-
-- `.env` - Your configuration (gitignored)
-- `.env.example` - Template
-- `.channels_cache_v2.json` - Channel cache (gitignored)
-- `.users_cache.json` - User cache (gitignored)
-
-## Technical Details
-
-Uses MCP (Model Context Protocol) JSON-RPC 2.0 over stdio transport.
-The script handles the initialization handshake and waits for cache to load.
+- `channels:read`, `channels:history` - Public channels
+- `groups:read`, `groups:history` - Private channels
+- `im:read`, `im:history` - DMs
+- `users:read` - User info
+- `search:read` - Search messages
+- `chat:write` - Post messages
